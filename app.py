@@ -62,7 +62,7 @@ if fetch:
 
         file_name = f"PVVNL 5 KW TO BELOW 10 KW MRI VISIT DATA AS ON DATE {today}.xlsx"
 
-        chunksize = 50000
+        chunksize = 20000
         start_row = 0
         total_rows = 0
 
@@ -111,3 +111,4 @@ if fetch:
 
         st.error("❌ Unexpected error occurred")
         st.error(str(e))
+

@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import pyodbc
 from datetime import datetime
-import io
+import tempfile
+import os
 
 st.title("PVVNL MRI Visit Data Downloader")
 
@@ -26,7 +27,7 @@ if fetch:
     try:
 
         # -----------------------------
-        # CONNECT SQL SERVER
+        # SQL CONNECTION
         # -----------------------------
         conn = pyodbc.connect(
             "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -44,6 +45,7 @@ if fetch:
         # CURRENT MONTH TABLE
         # -----------------------------
         year_month = datetime.today().strftime("%Y%m")
+
         table_name = f"PVVNL5_SAIADM..METER_READING_TRANS_{year_month}"
 
         query = f"""
@@ -54,53 +56,61 @@ if fetch:
         """
 
         # -----------------------------
-        # PREPARE EXCEL OUTPUT
+        # CREATE TEMP CSV FILE
         # -----------------------------
-        output = io.BytesIO()
-
-        today = datetime.today().strftime("%d-%m-%Y")
-
-        file_name = f"PVVNL 5 KW TO BELOW 10 KW MRI VISIT DATA AS ON DATE {today}.xlsx"
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+        file_path = temp_file.name
+        temp_file.close()
 
         chunksize = 15000
-        start_row = 0
         total_rows = 0
 
         progress = st.progress(0)
 
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        first_chunk = True
+
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
 
             for i, chunk in enumerate(pd.read_sql_query(query, conn, chunksize=chunksize)):
 
                 chunk = chunk.fillna("NULL")
 
-                chunk.to_excel(
-                    writer,
+                chunk.to_csv(
+                    f,
                     index=False,
-                    startrow=start_row,
-                    header=(start_row == 0)
+                    header=first_chunk
                 )
 
-                start_row += len(chunk)
+                first_chunk = False
                 total_rows += len(chunk)
 
                 progress.progress(min((i + 1) * 10, 100))
 
         conn.close()
 
-        output.seek(0)
-
         st.success(f"Total Records Fetched: {total_rows}")
+
+        # -----------------------------
+        # FILE NAME
+        # -----------------------------
+        today = datetime.today().strftime("%d-%m-%Y")
+
+        file_name = f"PVVNL 5 KW TO BELOW 10 KW MRI VISIT DATA AS ON DATE {today}.csv"
 
         # -----------------------------
         # DOWNLOAD BUTTON
         # -----------------------------
-        st.download_button(
-            label="Download Excel",
-            data=output,
-            file_name=file_name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        with open(file_path, "rb") as f:
+
+            st.download_button(
+                label="Download CSV",
+                data=f,
+                file_name=file_name,
+                mime="text/csv"
+            )
+
+        # optional cleanup
+        os.remove(file_path)
 
     except pyodbc.OperationalError as e:
 
@@ -111,5 +121,3 @@ if fetch:
 
         st.error("❌ Unexpected error occurred")
         st.error(str(e))
-
-

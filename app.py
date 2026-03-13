@@ -49,7 +49,7 @@ if fetch:
         table_name = f"PVVNL5_SAIADM..METER_READING_TRANS_{year_month}"
 
         query = f"""
-        SELECT mrt.*, mum.user_name
+        SELECT TOP 100 mrt.*, mum.user_name
         FROM {table_name} mrt
         LEFT JOIN PVVNL5_SAIADM..MOBILE_USER_MST mum
         ON mrt.upload_by = mum.USER_ID
@@ -103,3 +103,4 @@ if fetch:
 
         st.error("❌ Unexpected error occurred.")
         st.error(str(e))
+

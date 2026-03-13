@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
+import pyodbc
 from datetime import datetime
 import io
 
@@ -19,17 +19,27 @@ fetch = st.button("Fetch Data")
 
 if fetch:
 
+    # Check credentials
+    if not username or not password:
+        st.warning("Please enter username and password")
+        st.stop()
+
     try:
 
         # -----------------------------
-        # SQLAlchemy Engine
+        # SQL CONNECTION
         # -----------------------------
-        connection_string = (
-            f"mssql+pyodbc://{username}:{password}@{server}/{database}"
-            "?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
+        conn = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            f"SERVER=tcp:{server};"
+            f"DATABASE={database};"
+            f"UID={username};"
+            f"PWD={password};"
+            "TrustServerCertificate=yes;"
+            "Connection Timeout=30;"
         )
 
-        engine = create_engine(connection_string)
+        st.success("Database connected successfully")
 
         # -----------------------------
         # Current Month Table
@@ -45,12 +55,17 @@ if fetch:
         ON mrt.upload_by = mum.USER_ID
         """
 
-        df = pd.read_sql(query, engine)
+        # -----------------------------
+        # Fetch Data
+        # -----------------------------
+        df = pd.read_sql_query(query, conn)
+
+        conn.close()
 
         # Replace NaN with NULL
         df = df.fillna("NULL")
 
-        st.success(f"Total Records: {len(df)}")
+        st.success(f"Total Records Fetched: {len(df)}")
 
         # -----------------------------
         # Excel File Name
@@ -69,6 +84,9 @@ if fetch:
 
         output.seek(0)
 
+        # -----------------------------
+        # Download Button
+        # -----------------------------
         st.download_button(
             label="Download Excel",
             data=output,
@@ -76,5 +94,12 @@ if fetch:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+    except pyodbc.OperationalError as e:
+
+        st.error("❌ Database connection failed (timeout or server not reachable).")
+        st.error(str(e))
+
     except Exception as e:
-        st.error(e)
+
+        st.error("❌ Unexpected error occurred.")
+        st.error(str(e))

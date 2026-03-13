@@ -7,9 +7,6 @@ import os
 
 st.title("PVVNL MRI Visit Data Downloader")
 
-# -----------------------------
-# USER INPUT
-# -----------------------------
 server = "4.188.235.99,8225"
 database = "PVVNL5_SAIADM"
 
@@ -26,9 +23,6 @@ if fetch:
 
     try:
 
-        # -----------------------------
-        # SQL CONNECTION
-        # -----------------------------
         conn = pyodbc.connect(
             "DRIVER={ODBC Driver 17 for SQL Server};"
             f"SERVER=tcp:{server};"
@@ -41,9 +35,6 @@ if fetch:
 
         st.success("Database connected successfully")
 
-        # -----------------------------
-        # CURRENT MONTH TABLE
-        # -----------------------------
         year_month = datetime.today().strftime("%Y%m")
         table_name = f"PVVNL5_SAIADM..METER_READING_TRANS_{year_month}"
 
@@ -54,50 +45,69 @@ if fetch:
         ON mrt.upload_by = mum.USER_ID
         """
 
-        # -----------------------------
-        # CREATE TEMP EXCEL FILE
-        # -----------------------------
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         file_path = temp_file.name
         temp_file.close()
 
         chunksize = 25000
-        start_row = 0
         total_rows = 0
+
+        excel_row_limit = 1048576
+        sheet_number = 1
+        current_row = 1
 
         progress = st.progress(0)
 
         with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
 
+            workbook = writer.book
+            worksheet = workbook.add_worksheet(f"Sheet{sheet_number}")
+            writer.sheets[f"Sheet{sheet_number}"] = worksheet
+
+            header_written = False
+
             for i, chunk in enumerate(pd.read_sql_query(query, conn, chunksize=chunksize)):
 
                 chunk = chunk.fillna("NULL")
 
-                chunk.to_excel(
-                    writer,
-                    index=False,
-                    startrow=start_row,
-                    header=(start_row == 0)
-                )
+                if not header_written:
+                    for col_num, column in enumerate(chunk.columns):
+                        worksheet.write(0, col_num, column)
+                    header_written = True
 
-                start_row += len(chunk)
-                total_rows += len(chunk)
+                for _, row in chunk.iterrows():
 
-                progress.progress(min((i + 1) * 10, 100))
+                    # Create new sheet if Excel row limit reached
+                    if current_row >= excel_row_limit:
+
+                        sheet_number += 1
+                        worksheet = workbook.add_worksheet(f"Sheet{sheet_number}")
+                        writer.sheets[f"Sheet{sheet_number}"] = worksheet
+
+                        for col_num, column in enumerate(chunk.columns):
+                            worksheet.write(0, col_num, column)
+
+                        current_row = 1
+
+                    for col_idx, value in enumerate(row):
+
+                        if isinstance(value, str) and value.startswith("http"):
+                            worksheet.write_url(current_row, col_idx, value)
+                        else:
+                            worksheet.write(current_row, col_idx, value)
+
+                    current_row += 1
+                    total_rows += 1
+
+                progress.progress(min((i + 1) * 5, 100))
 
         conn.close()
 
         st.success(f"Total Records Fetched: {total_rows}")
 
-        # -----------------------------
-        # FILE NAME
-        # -----------------------------
         today = datetime.today().strftime("%d-%m-%Y")
         file_name = f"PVVNL 5 KW TO BELOW 10 KW MRI VISIT DATA AS ON DATE {today}.xlsx"
 
-        # -----------------------------
-        # DOWNLOAD BUTTON
-        # -----------------------------
         with open(file_path, "rb") as f:
 
             st.download_button(
@@ -109,13 +119,5 @@ if fetch:
 
         os.remove(file_path)
 
-    except pyodbc.OperationalError as e:
-
-        st.error("❌ Database connection failed")
-        st.error(str(e))
-
     except Exception as e:
-
-        st.error("❌ Unexpected error occurred")
         st.error(str(e))
-

@@ -61,7 +61,7 @@ if fetch:
         file_path = temp_file.name
         temp_file.close()
 
-        chunksize = 15000
+        chunksize = 25000
         start_row = 0
         total_rows = 0
 
@@ -118,3 +118,4 @@ if fetch:
 
         st.error("❌ Unexpected error occurred")
         st.error(str(e))
+

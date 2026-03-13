@@ -49,7 +49,7 @@ if fetch:
         file_path = temp_file.name
         temp_file.close()
 
-        chunksize = 25000
+        chunksize = 20000
         start_row = 0
         total_rows = 0
 

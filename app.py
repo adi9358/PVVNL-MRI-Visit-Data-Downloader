@@ -19,7 +19,6 @@ fetch = st.button("Fetch Data")
 
 if fetch:
 
-    # Check credentials
     if not username or not password:
         st.warning("Please enter username and password")
         st.stop()
@@ -27,7 +26,7 @@ if fetch:
     try:
 
         # -----------------------------
-        # SQL CONNECTION
+        # CONNECT SQL SERVER
         # -----------------------------
         conn = pyodbc.connect(
             "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -42,50 +41,59 @@ if fetch:
         st.success("Database connected successfully")
 
         # -----------------------------
-        # Current Month Table
+        # CURRENT MONTH TABLE
         # -----------------------------
         year_month = datetime.today().strftime("%Y%m")
-
         table_name = f"PVVNL5_SAIADM..METER_READING_TRANS_{year_month}"
 
         query = f"""
-        SELECT TOP 100 mrt.*, mum.user_name
+        SELECT mrt.*, mum.user_name
         FROM {table_name} mrt
         LEFT JOIN PVVNL5_SAIADM..MOBILE_USER_MST mum
         ON mrt.upload_by = mum.USER_ID
         """
 
         # -----------------------------
-        # Fetch Data
+        # PREPARE EXCEL OUTPUT
         # -----------------------------
-        df = pd.read_sql_query(query, conn)
+        output = io.BytesIO()
 
-        conn.close()
-
-        # Replace NaN with NULL
-        df = df.fillna("NULL")
-
-        st.success(f"Total Records Fetched: {len(df)}")
-
-        # -----------------------------
-        # Excel File Name
-        # -----------------------------
         today = datetime.today().strftime("%d-%m-%Y")
 
         file_name = f"PVVNL 5 KW TO BELOW 10 KW MRI VISIT DATA AS ON DATE {today}.xlsx"
 
-        # -----------------------------
-        # Write Excel
-        # -----------------------------
-        output = io.BytesIO()
+        chunksize = 50000
+        start_row = 0
+        total_rows = 0
+
+        progress = st.progress(0)
 
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False)
+
+            for i, chunk in enumerate(pd.read_sql_query(query, conn, chunksize=chunksize)):
+
+                chunk = chunk.fillna("NULL")
+
+                chunk.to_excel(
+                    writer,
+                    index=False,
+                    startrow=start_row,
+                    header=(start_row == 0)
+                )
+
+                start_row += len(chunk)
+                total_rows += len(chunk)
+
+                progress.progress(min((i + 1) * 10, 100))
+
+        conn.close()
 
         output.seek(0)
 
+        st.success(f"Total Records Fetched: {total_rows}")
+
         # -----------------------------
-        # Download Button
+        # DOWNLOAD BUTTON
         # -----------------------------
         st.download_button(
             label="Download Excel",
@@ -96,11 +104,10 @@ if fetch:
 
     except pyodbc.OperationalError as e:
 
-        st.error("❌ Database connection failed (timeout or server not reachable).")
+        st.error("❌ Database connection failed")
         st.error(str(e))
 
     except Exception as e:
 
-        st.error("❌ Unexpected error occurred.")
+        st.error("❌ Unexpected error occurred")
         st.error(str(e))
-

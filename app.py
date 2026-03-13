@@ -50,56 +50,33 @@ if fetch:
         temp_file.close()
 
         chunksize = 25000
+        start_row = 0
         total_rows = 0
-
-        excel_row_limit = 1048576
-        sheet_number = 1
-        current_row = 1
 
         progress = st.progress(0)
 
-        with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
-
-            workbook = writer.book
-            worksheet = workbook.add_worksheet(f"Sheet{sheet_number}")
-            writer.sheets[f"Sheet{sheet_number}"] = worksheet
-
-            header_written = False
+        with pd.ExcelWriter(
+            file_path,
+            engine="xlsxwriter",
+            engine_kwargs={"options": {"strings_to_urls": True}}
+        ) as writer:
 
             for i, chunk in enumerate(pd.read_sql_query(query, conn, chunksize=chunksize)):
 
                 chunk = chunk.fillna("NULL")
 
-                if not header_written:
-                    for col_num, column in enumerate(chunk.columns):
-                        worksheet.write(0, col_num, column)
-                    header_written = True
+                chunk.to_excel(
+                    writer,
+                    sheet_name="Data",
+                    startrow=start_row,
+                    index=False,
+                    header=(start_row == 0)
+                )
 
-                for _, row in chunk.iterrows():
+                start_row += len(chunk)
+                total_rows += len(chunk)
 
-                    # Create new sheet if Excel row limit reached
-                    if current_row >= excel_row_limit:
-
-                        sheet_number += 1
-                        worksheet = workbook.add_worksheet(f"Sheet{sheet_number}")
-                        writer.sheets[f"Sheet{sheet_number}"] = worksheet
-
-                        for col_num, column in enumerate(chunk.columns):
-                            worksheet.write(0, col_num, column)
-
-                        current_row = 1
-
-                    for col_idx, value in enumerate(row):
-
-                        if isinstance(value, str) and value.startswith("http"):
-                            worksheet.write_url(current_row, col_idx, value)
-                        else:
-                            worksheet.write(current_row, col_idx, value)
-
-                    current_row += 1
-                    total_rows += 1
-
-                progress.progress(min((i + 1) * 5, 100))
+                progress.progress(min((i + 1) * 10, 100))
 
         conn.close()
 

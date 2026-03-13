@@ -58,8 +58,10 @@ if fetch:
         with pd.ExcelWriter(
             file_path,
             engine="xlsxwriter",
-            engine_kwargs={"options": {"strings_to_urls": True}}
+            engine_kwargs={"options": {"strings_to_urls": False}}
         ) as writer:
+
+            sheet_name = "Data"
 
             for i, chunk in enumerate(pd.read_sql_query(query, conn, chunksize=chunksize)):
 
@@ -67,7 +69,7 @@ if fetch:
 
                 chunk.to_excel(
                     writer,
-                    sheet_name="Data",
+                    sheet_name=sheet_name,
                     startrow=start_row,
                     index=False,
                     header=(start_row == 0)
@@ -76,7 +78,7 @@ if fetch:
                 start_row += len(chunk)
                 total_rows += len(chunk)
 
-                progress.progress(min((i + 1) * 10, 100))
+                progress.progress(min(total_rows / 300000, 1.0))
 
         conn.close()
 
@@ -97,4 +99,5 @@ if fetch:
         os.remove(file_path)
 
     except Exception as e:
+        st.error("❌ Error occurred")
         st.error(str(e))

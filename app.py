@@ -7,7 +7,7 @@ import os
 
 st.title("PVVNL MRI Visit Data Downloader")
 
-server = "4.188.235.99,8225"
+server = "20.244.132.226"
 database = "PVVNL5_SAIADM"
 
 username = st.text_input("SQL Username", value="Avneesh")

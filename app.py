@@ -10,7 +10,7 @@ st.title("PVVNL MRI Visit Data Downloader")
 server = "20.244.132.226"
 database = "PVVNL5_SAIADM"
 
-username = st.text_input("SQL Username", value="Avneesh")
+username = st.text_input("SQL Username", value="avneesh@321#")
 password = st.text_input("SQL Password", type="password")
 
 fetch = st.button("Fetch Data")

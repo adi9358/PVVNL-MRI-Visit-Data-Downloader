@@ -16,7 +16,8 @@ st.title("PVVNL Data Downloader")
 server = "20.244.132.226"
 database = "PVVNL5_SAIADM"
 
-username = st.text_input("SQL Username", value="avneesh1")
+#username = st.text_input("SQL Username", value="avneesh1")
+username = "avneesh1"
 password = st.text_input("SQL Password", type="password")
 
 # =========================
